@@ -5,16 +5,17 @@ cd "$(dirname "$0")/.."
 CONFIG="${1:-release}"
 
 # UNIVERSAL=1 produces a binary that runs on both Apple Silicon and Intel.
-ARCH_FLAGS=()
-if [ "${UNIVERSAL:-0}" = "1" ]; then
-    ARCH_FLAGS=(--arch arm64 --arch x86_64)
-    echo "==> building universal (arm64 + x86_64)"
-fi
-
+# Spelled out rather than using an array: bash 3.2 (what ships with macOS)
+# treats an empty array as unbound under `set -u`.
 echo "==> swift build ($CONFIG)"
-swift build -c "$CONFIG" "${ARCH_FLAGS[@]}"
-
-BIN="$(swift build -c "$CONFIG" "${ARCH_FLAGS[@]}" --show-bin-path)/Stash"
+if [ "${UNIVERSAL:-0}" = "1" ]; then
+    echo "==> universal (arm64 + x86_64)"
+    swift build -c "$CONFIG" --arch arm64 --arch x86_64
+    BIN="$(swift build -c "$CONFIG" --arch arm64 --arch x86_64 --show-bin-path)/Stash"
+else
+    swift build -c "$CONFIG"
+    BIN="$(swift build -c "$CONFIG" --show-bin-path)/Stash"
+fi
 APP="build/Stash.app"
 
 rm -rf "$APP"
