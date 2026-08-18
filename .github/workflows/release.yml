@@ -1,0 +1,61 @@
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Toolchain
+        run: swift --version
+
+      - name: Self test
+        run: |
+          swift build -c debug
+          .build/debug/Stash --selftest
+
+      - name: Build universal app and DMG
+        env:
+          UNIVERSAL: '1'
+        run: ./Scripts/package.sh
+
+      - name: Verify both architectures made it in
+        run: lipo -info build/Stash.app/Contents/MacOS/Stash
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Stash-dmg
+          path: build/*.dmg
+
+      - name: Publish GitHub release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: build/*.dmg
+          generate_release_notes: true
+          body: |
+            ## Installing
+
+            Download the `.dmg`, open it, drag **Stash** to Applications.
+
+            This build is **not notarised by Apple** (that needs a paid Developer
+            account), so the first launch is blocked. To allow it:
+
+            1. Try to open Stash — macOS refuses.
+            2. Open **System Settings → Privacy & Security**, scroll down.
+            3. Click **Open Anyway** next to the message about Stash, then confirm.
+
+            You only do that once.
+
+            Stash then asks for two permissions: **Accessibility** (so it can paste
+            into the app you were using) and access to your **screenshot folder**.
+            Both are optional — it still works without them.
