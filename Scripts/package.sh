@@ -25,7 +25,8 @@ if [ -n "${DEVELOPER_ID:-}" ]; then
     codesign --verify --deep --strict --verbose=2 "$APP"
 else
     echo "==> no DEVELOPER_ID set — keeping the ad-hoc signature"
-    echo "    (users will need to right-click → Open the first time)"
+    echo "    (on first launch users must allow it in"
+    echo "     System Settings > Privacy & Security > Open Anyway)"
 fi
 
 echo "==> staging disk image"
