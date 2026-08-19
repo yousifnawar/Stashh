@@ -9,7 +9,7 @@ whatever you were working in.
 
 ![The notch shell, expanded](docs/notch-expanded.png)
 
-[![CI](https://github.com/yousifnawar00-a11y/Stash/actions/workflows/ci.yml/badge.svg)](https://github.com/yousifnawar00-a11y/Stash/actions/workflows/ci.yml)
+[![CI](https://github.com/yousifnawar00-a11y/Stashh/actions/workflows/ci.yml/badge.svg)](https://github.com/yousifnawar00-a11y/Stashh/actions/workflows/ci.yml)
 ![Platform: macOS 14+](https://img.shields.io/badge/platform-macOS%2014%2B-lightgrey)
 ![Licence: MIT](https://img.shields.io/badge/licence-MIT-blue)
 
@@ -17,7 +17,7 @@ whatever you were working in.
 
 ## Install
 
-Grab the latest `.dmg` from [**Releases**](https://github.com/yousifnawar00-a11y/Stash/releases/latest),
+Grab the latest `.dmg` from [**Releases**](https://github.com/yousifnawar00-a11y/Stashh/releases/latest),
 open it, and drag Stash to Applications. The build is universal — Apple Silicon and Intel.
 
 > **First launch is blocked, and that's expected.** The app isn't notarised by Apple
@@ -28,8 +28,8 @@ open it, and drag Stash to Applications. The build is universal — Apple Silico
 Or build it yourself, which sidesteps that entirely:
 
 ```bash
-git clone https://github.com/yousifnawar00-a11y/Stash.git
-cd Stash
+git clone https://github.com/yousifnawar00-a11y/Stashh.git
+cd Stashh
 ./Scripts/run.sh
 ```
 
