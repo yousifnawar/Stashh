@@ -15,6 +15,8 @@ final class Settings: ObservableObject {
             NotificationCenter.default.post(name: .stashNotchPreferenceChanged, object: nil)
         }
     }
+    /// The file shelf: catch files dragged to the top of the screen and hold them.
+    @Published var shelfEnabled: Bool { didSet { d.set(shelfEnabled, forKey: "shelfEnabled") } }
     /// When off, the shell only opens from its shortcut or the menu bar.
     @Published var notchOpensOnHover: Bool {
         didSet {
@@ -51,6 +53,7 @@ final class Settings: ObservableObject {
         captureScreenshots = bool("captureScreenshots", true)
         notchEnabled = bool("notchEnabled", true)
         notchOpensOnHover = bool("notchOpensOnHover", true)
+        shelfEnabled = bool("shelfEnabled", true)
         pasteDirectly = bool("pasteDirectly", true)
         playSound = bool("playSound", false)
         retentionDays = d.object(forKey: "retentionDays") as? Int ?? 30

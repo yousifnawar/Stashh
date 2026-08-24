@@ -5,16 +5,19 @@ import UniformTypeIdentifiers
 /// The black shell that grows out of the notch. Collapsed it is invisible against
 /// the real notch; expanded it is a full clip strip.
 struct NotchShellView: View {
-    /// `preselect` is a hook for the offscreen preview renderer.
-    init(controller: NotchController, preselect: Int = 0) {
+    /// `preselect` and `startTab` are hooks for the offscreen preview renderer.
+    init(controller: NotchController, preselect: Int = 0, startTab: NotchTab = .clips) {
         self.controller = controller
         self.preselect = preselect
+        _tab = State(initialValue: startTab)
     }
     private let preselect: Int
 
     @ObservedObject var controller: NotchController
     @ObservedObject private var store = ClipStore.shared
+    @ObservedObject private var shelf = ShelfStore.shared
     @State private var filter: ItemKind?
+    @State private var tab: NotchTab
     /// Clips picked with the selection circles, for dragging several out at once.
     @State private var selection: Set<String> = []
 
@@ -62,6 +65,7 @@ struct NotchShellView: View {
         .onChange(of: controller.isDropTargeted) { _, targeted in
             if targeted { controller.expand() }
         }
+        .onChange(of: tab) { _, _ in selection.removeAll() }
         .onChange(of: controller.state) { _, state in
             // A closed shell forgets what was picked.
             if state != .expanded { selection.removeAll() }
@@ -80,6 +84,7 @@ struct NotchShellView: View {
     private var content: some View {
         switch controller.state {
         case .collapsed: collapsedContent
+        case .dropZone:  dropZoneContent
         case .expanded:  expandedContent
         }
     }
@@ -100,16 +105,65 @@ struct NotchShellView: View {
         }
     }
 
+    /// The target that appears when a dragged file reaches the top of the screen.
+    private var dropZoneContent: some View {
+        HStack(spacing: 0) {
+            HStack(spacing: 9) {
+                Image(systemName: controller.isDropTargeted
+                      ? "tray.and.arrow.down.fill" : "tray.and.arrow.down")
+                    .font(.system(size: 16, weight: .medium))
+                    .foregroundStyle(controller.isDropTargeted ? Theme.accent : Theme.secondary)
+                VStack(alignment: .leading, spacing: 1) {
+                    Text(controller.isDropTargeted ? "Release to hold" : "Drop files here")
+                        .font(.system(size: 12.5, weight: .semibold))
+                        .foregroundStyle(Theme.primary)
+                    Text("Park them for later")
+                        .font(.system(size: 10))
+                        .foregroundStyle(Theme.tertiary)
+                        .lineLimit(1)
+                }
+            }
+            .padding(.leading, 18)
+            .frame(maxWidth: .infinity, alignment: .leading)
+
+            Spacer().frame(width: notch.width)
+
+            HStack(spacing: 8) {
+                if !shelf.isEmpty {
+                    Text("\(shelf.items.count) on the shelf")
+                        .font(.system(size: 10.5))
+                        .foregroundStyle(Theme.secondary)
+                }
+                Image(systemName: "arrow.down.to.line")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(controller.isDropTargeted ? Theme.accent : Theme.tertiary)
+            }
+            .padding(.trailing, 18)
+            .frame(maxWidth: .infinity, alignment: .trailing)
+        }
+        .frame(height: NotchGeometry.dropZoneSize(notch: notch).height)
+        .background(
+            RoundedRectangle(cornerRadius: Theme.notchCornerRadius, style: .continuous)
+                .strokeBorder(controller.isDropTargeted ? Theme.accent : Color.white.opacity(0.14),
+                              style: StrokeStyle(lineWidth: 1.5, dash: [5, 4]))
+                .padding(.horizontal, 8)
+                .padding(.bottom, 7)
+                .padding(.top, notch.height * 0.35)
+        )
+    }
+
     private var expandedContent: some View {
         VStack(spacing: 0) {
             header
             Divider().overlay(Color.white.opacity(0.07))
-            if visibleItems.isEmpty {
-                emptyState
-            } else {
-                strip
+            switch tab {
+            case .clips:
+                if visibleItems.isEmpty { emptyState } else { strip }
+                footer
+            case .shelf:
+                if shelf.items.isEmpty { shelfEmptyState } else { shelfStrip }
+                shelfFooter
             }
-            footer
         }
         .frame(width: shell.width, height: shell.height)
     }
@@ -118,20 +172,18 @@ struct NotchShellView: View {
 
     private var header: some View {
         HStack(spacing: 0) {
-            HStack(spacing: 8) {
+            HStack(spacing: 7) {
                 Image(systemName: "square.on.square.dashed")
                     .font(.system(size: 12, weight: .semibold))
                     .foregroundStyle(Theme.accent)
-                Text("Stash")
-                    .font(.system(size: 12.5, weight: .semibold))
-                    .foregroundStyle(Theme.primary)
-                Text("\(store.items.count)")
-                    .font(.system(size: 10, weight: .medium))
-                    .foregroundStyle(Theme.tertiary)
-                    .padding(.horizontal, 5).padding(.vertical, 1.5)
-                    .background(Capsule().fill(Color.white.opacity(0.08)))
+                TabPill(title: "Clips", count: store.items.count,
+                        active: tab == .clips) { tab = .clips }
+                TabPill(title: "Shelf", count: shelf.items.count,
+                        active: tab == .shelf, tint: Color(nsColor: ItemKind.file.accent)) {
+                    tab = .shelf
+                }
             }
-            .padding(.leading, 18)
+            .padding(.leading, 16)
             .frame(maxWidth: .infinity, alignment: .leading)
 
             Spacer().frame(width: notch.width + 8)
@@ -237,6 +289,91 @@ struct NotchShellView: View {
         .frame(height: 42)
     }
 
+    // MARK: - Shelf
+
+    private var shelfStrip: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 10) {
+                ForEach(shelf.items) { item in
+                    ClipTile(item: item, width: 146, height: 112,
+                             selected: selection.contains(item.id),
+                             multiDrag: shelfMultiDragSource(for: item),
+                             onToggleSelect: { toggle(item) },
+                             onActivate: { revealOrOpen(item) })
+                        .opacity(ShelfStore.isMissing(item) ? 0.45 : 1)
+                        .overlay(alignment: .topTrailing) { removeButton(item) }
+                }
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 12)
+        }
+        .frame(height: 136)
+    }
+
+    private func removeButton(_ item: ClipItem) -> some View {
+        ShelfRemoveButton { shelf.remove(item) }
+    }
+
+    private var shelfEmptyState: some View {
+        VStack(spacing: 6) {
+            Image(systemName: "tray.and.arrow.down")
+                .font(.system(size: 20))
+                .foregroundStyle(Theme.tertiary)
+            Text("Drag a file to the top of the screen to park it here")
+                .font(.system(size: 11.5))
+                .foregroundStyle(Theme.secondary)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .frame(height: 136)
+    }
+
+    private var shelfFooter: some View {
+        HStack(spacing: 8) {
+            if !selection.isEmpty {
+                Text(selection.count == 1 ? "1 selected · pick more"
+                                          : "\(selection.count) selected · drag to take all")
+                    .font(.system(size: 10, weight: .medium))
+                    .foregroundStyle(Theme.accent)
+                Button("Clear") { selection.removeAll() }
+                    .buttonStyle(.plain)
+                    .font(.system(size: 10)).foregroundStyle(Theme.secondary)
+                Button("Remove") { shelf.remove(selectedShelfItems); selection.removeAll() }
+                    .buttonStyle(.plain)
+                    .font(.system(size: 10)).foregroundStyle(.red.opacity(0.9))
+            } else if !shelf.isEmpty {
+                Text("drag out to move · click to reveal in Finder")
+                    .font(.system(size: 10)).foregroundStyle(Theme.tertiary)
+            }
+            Spacer(minLength: 0)
+            if !shelf.isEmpty {
+                Button("Empty Shelf") {
+                    shelf.clear()
+                    selection.removeAll()
+                }
+                .buttonStyle(.plain)
+                .font(.system(size: 10)).foregroundStyle(Theme.secondary)
+            }
+        }
+        .padding(.horizontal, 16)
+        .padding(.bottom, 12)
+        .padding(.top, 2)
+        .frame(height: 42)
+    }
+
+    private var selectedShelfItems: [ClipItem] {
+        shelf.items.filter { selection.contains($0.id) }
+    }
+
+    private func shelfMultiDragSource(for item: ClipItem) -> (() -> [ClipItem])? {
+        guard selection.count > 1, selection.contains(item.id) else { return nil }
+        return { selectedShelfItems }
+    }
+
+    private func revealOrOpen(_ item: ClipItem) {
+        guard let url = ShelfStore.url(for: item) else { return }
+        NSWorkspace.shared.activateFileViewerSelecting([url])
+    }
+
     // MARK: - Selection
 
     private var selectedItems: [ClipItem] {
@@ -259,10 +396,13 @@ struct NotchShellView: View {
 
     // MARK: - Drop
 
+    /// Files dropped on the notch are parked on the shelf, not filed into the
+    /// permanent history — that is what the library window is for.
     private func handleDrop(_ providers: [NSItemProvider]) -> Bool {
         DropIngest.collect(providers) { payloads in
             guard !payloads.isEmpty else { return }
-            Paster.ingestDropped(payloads)
+            let added = shelf.add(payloads: payloads)
+            if added > 0 { tab = .shelf }
             controller.expand()
         }
         return true
@@ -270,6 +410,59 @@ struct NotchShellView: View {
 }
 
 // MARK: - Small controls
+
+enum NotchTab { case clips, shelf }
+
+/// Sits quietly in the corner of a shelf tile until you reach for it.
+struct ShelfRemoveButton: View {
+    var action: () -> Void
+    @State private var hovering = false
+
+    var body: some View {
+        Button(action: action) {
+            Image(systemName: "xmark")
+                .font(.system(size: 7.5, weight: .bold))
+                .foregroundStyle(.white.opacity(hovering ? 1 : 0.75))
+                .padding(3.5)
+                .background(Circle().fill(Color.black.opacity(hovering ? 0.85 : 0.45)))
+        }
+        .buttonStyle(.plain)
+        .padding(5)
+        .stashHover($hovering)
+        .help("Take off the shelf")
+    }
+}
+
+struct TabPill: View {
+    let title: String
+    let count: Int
+    let active: Bool
+    var tint: Color = Theme.accent
+    var action: () -> Void
+    @State private var hovering = false
+
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: 4) {
+                Text(title)
+                    .font(.system(size: 11.5, weight: active ? .semibold : .medium))
+                Text("\(count)")
+                    .font(.system(size: 9.5, weight: .medium))
+                    .opacity(0.75)
+            }
+            .foregroundStyle(active ? Color.black.opacity(0.85)
+                                    : (hovering ? Theme.primary : Theme.secondary))
+            .padding(.horizontal, 8)
+            .padding(.vertical, 3.5)
+            .background(
+                Capsule().fill(active ? tint
+                               : (hovering ? Color.white.opacity(0.12) : Color.white.opacity(0.06)))
+            )
+        }
+        .buttonStyle(.plain)
+        .stashHover($hovering)
+    }
+}
 
 struct NotchButton: View {
     let symbol: String

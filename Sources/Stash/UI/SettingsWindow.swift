@@ -59,6 +59,14 @@ struct SettingsView: View {
                         .font(.system(size: 11)).foregroundStyle(Theme.tertiary)
                 }
 
+                group("File Shelf") {
+                    Toggle("Catch files dragged to the top of the screen", isOn: $settings.shelfEnabled)
+                    Text(settings.shelfEnabled
+                         ? "Drag any file toward the notch and a drop target appears. Parked files wait on the Shelf tab until you drag them somewhere else."
+                         : "Dragging files to the notch does nothing. The Shelf tab still holds anything already parked there.")
+                        .font(.system(size: 11)).foregroundStyle(Theme.tertiary)
+                }
+
                 group("Shortcuts") {
                     ShortcutsSection()
                 }

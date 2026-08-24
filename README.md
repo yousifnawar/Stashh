@@ -53,6 +53,21 @@ Requires macOS 14+ and the Xcode command line tools.
   rules that file new clips automatically.
 - Pinning, free-form tags, and a retention window you choose.
 
+**Holds files while you move them**
+
+Start dragging a file and take it toward the top of the screen — a drop target slides
+out of the notch. Let go and the file waits on the Shelf until you drag it wherever
+it was going. Useful when the destination folder isn't open yet, or the file is in
+one window and the target is in another.
+
+![The drop target that appears mid-drag](docs/notch-dropzone.png)
+
+![Files parked on the shelf](docs/notch-shelf.png)
+
+Stash hard-links or copies each file into its own storage, so the shelf keeps working
+even if you move or delete the original. Parked files stay out of the clipboard
+history — the shelf is a staging area, not an archive.
+
 **Four ways back in**
 
 | Surface | Default shortcut | What it's for |
@@ -75,7 +90,8 @@ instead of trigger, and warns you when a choice shadows a common system shortcut
 
 Hover any clip — in the notch or the library — and a selection circle appears in its
 corner. Tick as many as you like, then drag any one of them to take the whole set
-into another app. Dropping a pile of images onto the notch stashes them all in one go.
+into another app. This works for shelf files too, so you can park a pile and move
+them together.
 
 ![Selecting several clips in the notch](docs/notch-selection.png)
 
@@ -125,8 +141,9 @@ Two dev entry points make the parts that normally need a human testable:
 ```
 
 `--selftest` covers the drag-and-drop plumbing (multi-file drops, ordering, images
-dragged from a browser with no file behind them, pasteboard writers) and the shortcut
-system (rebinding rules, modifier ordering, Carbon translation, conflict detection,
+dragged from a browser with no file behind them, pasteboard writers), the file shelf
+(staging, surviving a deleted original, de-duplication, promotion to history) and the
+shortcut system (rebinding rules, modifier ordering, Carbon translation, conflict detection,
 persistence of cleared bindings). `--render-preview` renders the notch, library,
 search, settings and every tutorial page through real offscreen windows, so layout
 regressions show up without launching anything. Both redirect their storage to a
@@ -159,13 +176,13 @@ NOTARY_PROFILE=stash-notary \
 Sources/Stash/
   App/         lifecycle, hot keys, shortcut registry, menu bar, settings, dev harnesses
   Model/       ClipItem, Category, fuzzy scoring, shared helpers
-  Store/       SQLite wrapper and ClipStore, the single source of truth
+  Store/       SQLite wrapper, ClipStore and the file shelf
   Capture/     clipboard polling, screenshot watching, type classification, blobs
   Paste/       pasteboard writing, ⌘V synthesis, drag providers, drop ingestion
   UI/          notch shell, quick search, library, inspector, tutorial, theme
 ```
 
-Roughly 5,000 lines of Swift, no third-party dependencies.
+Roughly 5,500 lines of Swift, no third-party dependencies.
 
 ### Problems worth noting
 
@@ -184,6 +201,12 @@ off, that region shrinks to nothing.
 Dragging a multi-selection drops to AppKit and starts a real `NSDraggingSession` with
 one dragging item per clip — but only on tiles that are part of a selection, so the
 single-clip path stays pure SwiftUI.
+
+**macOS won't tell you a drag has started.** There is no notification for it, so the
+shelf watches the drag pasteboard's change count alongside the mouse button state —
+the change count ticks the instant any drag begins anywhere on the system. The drop
+target only appears once that drag reaches the top strip of the screen, so it stays
+out of the way the rest of the time.
 
 **Key names have to come from the keyboard layout.** The shortcut recorder resolves
 key codes through `UCKeyTranslate` against the active input source rather than

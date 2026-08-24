@@ -36,10 +36,16 @@ enum NotchGeometry {
         CGSize(width: expandedWidth, height: max(notch.height, 34) + 1 + 136 + 42)
     }
 
+    static func dropZoneSize(notch: CGSize) -> CGSize {
+        CGSize(width: max(notch.width + 420, 580), height: max(notch.height + 44, 80))
+    }
+
 }
 
 enum NotchState: Equatable {
     case collapsed
+    /// A drag is heading for the notch: show a target to drop files onto.
+    case dropZone
     case expanded
 }
 
@@ -85,7 +91,27 @@ final class NotchController: ObservableObject {
     private var collapseWork: DispatchWorkItem?
     private var cancellables = Set<AnyCancellable>()
 
-    private init() {}
+    private init() {
+        observeSystemDrags()
+    }
+
+    /// Opens a drop target when a file drag reaches the top of the screen, and
+    /// puts it away again when the drag ends elsewhere.
+    private func observeSystemDrags() {
+        let watcher = DragWatcher.shared
+        watcher.$isDragging
+            .combineLatest(watcher.$isNearTop)
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] dragging, nearTop in
+                guard let self, self.panel != nil else { return }
+                if dragging && nearTop {
+                    self.showDropZone()
+                } else if self.state == .dropZone {
+                    self.collapse()
+                }
+            }
+            .store(in: &cancellables)
+    }
 
     // MARK: Lifecycle
 
@@ -168,6 +194,7 @@ final class NotchController: ObservableObject {
     var shellSize: CGSize {
         switch state {
         case .collapsed: return metrics.notchSize
+        case .dropZone: return NotchGeometry.dropZoneSize(notch: metrics.notchSize)
         case .expanded: return NotchGeometry.expandedSize(notch: metrics.notchSize)
         }
     }
@@ -178,6 +205,11 @@ final class NotchController: ObservableObject {
         let s = shellSize
         // Collapsed keeps a slightly wider/taller strip so the pointer reliably
         // finds the notch on the way past.
+        if state == .dropZone {
+            // Widen the catch area well beyond the visible target so the drop is easy.
+            return CGRect(x: 0, y: 0, width: win.width,
+                          height: NotchGeometry.dropZoneSize(notch: metrics.notchSize).height + 34)
+        }
         if state == .collapsed && !Settings.shared.notchOpensOnHover {
             return .zero   // nothing to hover; let clicks fall through to the desktop
         }
@@ -232,6 +264,8 @@ final class NotchController: ObservableObject {
         let trigger = triggerRect
         // Hovering only opens the shell when the user has asked for that; once it
         // is open, the pointer still keeps it open.
+        // Never let a stray pointer move dismiss an active drop target.
+        if state == .dropZone { return }
         let hoverMayOpen = Settings.shared.notchOpensOnHover || state == .expanded
         if let p = newPointer, hoverMayOpen, trigger.contains(p) {
             expand()
@@ -252,6 +286,11 @@ final class NotchController: ObservableObject {
     private var triggerRect: CGRect {
         let win = NotchGeometry.windowSize
         let n = metrics.notchSize
+        if state == .dropZone {
+            // Deliberately forgiving: a dragged file only has to reach the top strip.
+            return CGRect(x: 0, y: 0, width: win.width,
+                          height: NotchGeometry.dropZoneSize(notch: metrics.notchSize).height + 34)
+        }
         if state == .expanded {
             let expanded = NotchGeometry.expandedSize(notch: metrics.notchSize)
             return CGRect(x: (win.width - expanded.width) / 2, y: 0,
@@ -262,6 +301,13 @@ final class NotchController: ObservableObject {
     }
 
     // MARK: State transitions
+
+    func showDropZone() {
+        collapseWork?.cancel()
+        guard state == .collapsed else { return }
+        withAnimation(Theme.snappy) { state = .dropZone }
+        updateGate()
+    }
 
     /// The keyboard shortcut: opens if closed, closes if open.
     func toggleFromShortcut() {

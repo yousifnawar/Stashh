@@ -14,6 +14,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         HotKeys.installDefaults()
         ClipboardMonitor.shared.start()
         ScreenshotWatcher.shared.start()
+        DragWatcher.shared.start()
         NotchController.shared.start()
 
         NotificationCenter.default.publisher(for: .stashShowQuickSearch)
@@ -77,6 +78,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationWillTerminate(_ notification: Notification) {
         ClipboardMonitor.shared.stop()
         ScreenshotWatcher.shared.stop()
+        DragWatcher.shared.stop()
         NotchController.shared.stop()
     }
 

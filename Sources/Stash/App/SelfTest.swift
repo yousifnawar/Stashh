@@ -27,6 +27,7 @@ enum SelfTest {
         testPasteboardWriters()
         testShortcutBinding()
         testShortcutPersistence()
+        testShelf()
 
         print(failures == 0 ? "\nALL PASSED" : "\n\(failures) FAILED")
         // Exit code matters: CI treats a non-zero status as a failed build.
@@ -184,6 +185,64 @@ enum SelfTest {
         check("reset restores every default",
               ShortcutID.allCases.allSatisfy { shortcuts.combo($0) == $0.defaultCombo })
         check("reset clears the cleared list", storedCleared().isEmpty, "\(storedCleared())")
+    }
+
+    private static func testShelf() {
+        let shelf = ShelfStore.shared
+        shelf.clear()
+        pump(0.3)
+
+        // Park three files, one of them an image.
+        let doc = URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent("report.pdf")
+        try? Data("not really a pdf".utf8).write(to: doc)
+        let img = makePNG(named: "shelf-shot", hue: 0.3)
+        let txt = URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent("todo.txt")
+        try? "buy milk".write(to: txt, atomically: true, encoding: .utf8)
+
+        let added = shelf.add(urls: [doc, img, txt])
+        check("three files parked", added == 3, "added \(added)")
+        pump(0.6)
+
+        let titles = shelf.items.map(\.title)
+        check("drop order preserved", titles == ["report.pdf", "shelf-shot.png", "todo.txt"],
+              "got \(titles)")
+        check("image recognised as an image",
+              shelf.items.first { $0.title == "shelf-shot.png" }?.kind == .image)
+        check("document kept as a file",
+              shelf.items.first { $0.title == "report.pdf" }?.kind == .file)
+        check("everything got a thumbnail", shelf.items.allSatisfy { $0.thumbPath != nil })
+
+        // Staging: the shelf must survive the original being deleted.
+        check("files staged into Stash's own storage",
+              shelf.items.allSatisfy { $0.blobPath != nil }, "\(shelf.items.map(\.blobPath))")
+        try? FileManager.default.removeItem(at: doc)
+        let parked = shelf.items.first { $0.title == "report.pdf" }!
+        check("survives the original being deleted", !ShelfStore.isMissing(parked))
+        check("drag uses the staged copy",
+              (Paster.pasteboardWriter(for: parked) as? NSURL)?.path == parked.blobPath,
+              "\(String(describing: (Paster.pasteboardWriter(for: parked) as? NSURL)?.path))")
+
+        // Duplicates
+        let again = shelf.add(urls: [img])
+        check("same file is not parked twice", again == 0 && shelf.items.count == 3,
+              "added \(again), count \(shelf.items.count)")
+
+        // The shelf is not the clip history
+        let historyBefore = ClipStore.shared.items.count
+        check("shelf entries stay out of the history",
+              ClipStore.shared.items.count == historyBefore)
+        shelf.keepInHistory(parked)
+        pump(0.4)
+        check("keeping one promotes it to the history",
+              ClipStore.shared.items.count == historyBefore + 1)
+
+        // Removal
+        shelf.remove(parked)
+        pump(0.3)
+        check("removing takes it off the shelf", shelf.items.count == 2)
+        shelf.clear()
+        pump(0.3)
+        check("emptying clears everything", shelf.isEmpty)
     }
 
     private static func storedRaw() -> [String: Any] {

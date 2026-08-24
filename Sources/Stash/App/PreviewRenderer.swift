@@ -33,6 +33,22 @@ enum PreviewRenderer {
                size: NotchGeometry.windowSize,
                to: out.appendingPathComponent("notch-selection.png"))
 
+        seedShelf()
+
+        notch.state = .dropZone
+        render(NotchShellView(controller: notch)
+                .frame(width: NotchGeometry.windowSize.width, height: NotchGeometry.windowSize.height)
+                .background(Color(nsColor: NSColor(srgbRed: 0.16, green: 0.17, blue: 0.2, alpha: 1))),
+               size: NotchGeometry.windowSize,
+               to: out.appendingPathComponent("notch-dropzone.png"))
+
+        notch.state = .expanded
+        render(NotchShellView(controller: notch, startTab: .shelf)
+                .frame(width: NotchGeometry.windowSize.width, height: NotchGeometry.windowSize.height)
+                .background(Color(nsColor: NSColor(srgbRed: 0.16, green: 0.17, blue: 0.2, alpha: 1))),
+               size: NotchGeometry.windowSize,
+               to: out.appendingPathComponent("notch-shelf.png"))
+
         render(LibraryView().frame(width: 1120, height: 720),
                size: CGSize(width: 1120, height: 720),
                to: out.appendingPathComponent("library.png"))
@@ -56,7 +72,7 @@ enum PreviewRenderer {
                size: CGSize(width: 480, height: 900),
                to: out.appendingPathComponent("settings.png"))
 
-        for i in 0..<7 {
+        for i in 0..<8 {
             render(OnboardingView(startAt: i, onFinish: {}).frame(width: 720, height: 560),
                    size: CGSize(width: 720, height: 560),
                    to: out.appendingPathComponent("tutorial-\(i + 1).png"))
@@ -96,6 +112,38 @@ enum PreviewRenderer {
             try? data.write(to: url)
         }
         window.orderOut(nil)
+    }
+
+    /// A few parked files so the shelf preview isn't empty.
+    private static func seedShelf() {
+        guard ShelfStore.shared.isEmpty else { return }
+        let dir = URL(fileURLWithPath: NSTemporaryDirectory())
+            .appendingPathComponent("stash-shelf-seed", isDirectory: true)
+        try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+
+        var urls: [URL] = []
+        for name in ["Contract v3.pdf", "Budget.numbers", "notes.md"] {
+            let url = dir.appendingPathComponent(name)
+            try? Data("sample".utf8).write(to: url)
+            urls.append(url)
+        }
+        let shot = dir.appendingPathComponent("Mockup.png")
+        if let rep = NSBitmapImageRep(bitmapDataPlanes: nil, pixelsWide: 300, pixelsHigh: 200,
+                                      bitsPerSample: 8, samplesPerPixel: 4, hasAlpha: true,
+                                      isPlanar: false, colorSpaceName: .deviceRGB,
+                                      bytesPerRow: 0, bitsPerPixel: 0) {
+            NSGraphicsContext.saveGraphicsState()
+            NSGraphicsContext.current = NSGraphicsContext(bitmapImageRep: rep)
+            NSColor(srgbRed: 0.42, green: 0.55, blue: 0.95, alpha: 1).setFill()
+            NSRect(x: 0, y: 0, width: 300, height: 200).fill()
+            NSColor.white.withAlphaComponent(0.85).setFill()
+            NSRect(x: 40, y: 120, width: 220, height: 40).fill()
+            NSGraphicsContext.restoreGraphicsState()
+            try? rep.representation(using: .png, properties: [:])?.write(to: shot)
+            urls.insert(shot, at: 0)
+        }
+        ShelfStore.shared.add(urls: urls)
+        RunLoop.main.run(until: Date().addingTimeInterval(0.8))
     }
 
     /// Sample content so previews aren't empty on a fresh install.

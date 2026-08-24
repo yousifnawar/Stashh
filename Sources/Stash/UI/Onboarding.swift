@@ -63,7 +63,7 @@ private struct Page: Identifiable {
     var accent: Color
     var art: Art
 
-    enum Art { case welcome, notch, search, library, organize, shortcuts, permissions }
+    enum Art { case welcome, notch, search, library, organize, shelf, shortcuts, permissions }
 }
 
 struct OnboardingView: View {
@@ -105,6 +105,11 @@ struct OnboardingView: View {
                  title: "Pin, tag, drag, drop",
                  body: "Right-click any clip to pin it, file it into a category or delete it.\n\nHover any clip and a selection circle appears in its corner — in the notch and in the library. Click a few circles, then drag any one of them to take the whole set into another app. Dropping a pile of images onto the notch stashes them all in one go.",
                  accent: Color(nsColor: ItemKind.code.accent), art: .organize),
+
+            Page(eyebrow: "The shelf",
+                 title: "Park a file, drop it somewhere else",
+                 body: "Start dragging any file and move it toward the top of the screen. A drop target slides out of the notch — let go and the file waits there.\n\nPick it up whenever you like from the Shelf tab and drag it wherever it was going. Handy when the folder you want isn't open yet, or the file is in one window and the destination is in another.\n\nStash keeps its own copy, so the shelf still works if you move or delete the original.",
+                 accent: Color(nsColor: ItemKind.file.accent), art: .shelf),
 
             Page(eyebrow: "Your keys, your rules",
                  title: "Change any shortcut you like",
@@ -246,6 +251,60 @@ private struct OnboardingArt: View {
         case .library: library
         case .organize: organize
         case .shortcuts: shortcuts
+        case .shelf: shelf
+        }
+    }
+
+    /// A file arcing up into a drop target under the notch.
+    private var shelf: some View {
+        VStack(spacing: 0) {
+            ZStack(alignment: .top) {
+                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                    .fill(Color.white.opacity(0.05))
+                    .frame(height: 22)
+                Capsule().fill(Color.black).frame(width: 110, height: 22)
+            }
+            .frame(width: 440)
+
+            BottomRoundedShape(radius: 16)
+                .fill(Color.black)
+                .frame(width: 400, height: 78)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 11, style: .continuous)
+                        .strokeBorder(accent, style: StrokeStyle(lineWidth: 1.5, dash: [5, 4]))
+                        .padding(.horizontal, 10)
+                        .padding(.top, 14)
+                        .padding(.bottom, 8)
+                )
+                .overlay(
+                    HStack(spacing: 9) {
+                        Image(systemName: "tray.and.arrow.down.fill")
+                            .font(.system(size: 15))
+                            .foregroundStyle(accent)
+                        Text("Drop files here")
+                            .font(.system(size: 12, weight: .semibold))
+                            .foregroundStyle(Theme.primary)
+                    }
+                    .padding(.top, 12)
+                )
+                .shadow(color: .black.opacity(0.5), radius: 16, y: 8)
+
+            HStack(spacing: 10) {
+                ForEach(["doc.fill", "photo.fill", "tablecells.fill"], id: \.self) { icon in
+                    RoundedRectangle(cornerRadius: 9, style: .continuous)
+                        .fill(Theme.panelRaised)
+                        .overlay(RoundedRectangle(cornerRadius: 9, style: .continuous)
+                            .strokeBorder(Theme.stroke, lineWidth: 1))
+                        .overlay(Image(systemName: icon)
+                            .font(.system(size: 15))
+                            .foregroundStyle(accent.opacity(0.85)))
+                        .frame(width: 64, height: 48)
+                }
+                Image(systemName: "arrow.up.right")
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(Theme.tertiary)
+            }
+            .padding(.top, 18)
         }
     }
 

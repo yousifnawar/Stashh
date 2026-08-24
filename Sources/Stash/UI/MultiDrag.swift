@@ -78,6 +78,7 @@ final class MultiDragView: NSView, NSDraggingSource {
     private func beginDrag(with event: NSEvent) {
         let clips = itemsProvider()
         guard !clips.isEmpty else { return }
+        DragWatcher.shared.suppressUntilMouseUp()
 
         var draggingItems: [NSDraggingItem] = []
         for (i, clip) in clips.enumerated() {

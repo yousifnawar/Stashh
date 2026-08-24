@@ -86,6 +86,9 @@ enum Paths {
     static let blobs: URL = sub("Blobs")
     static let thumbs: URL = sub("Thumbnails")
     static let texts: URL = sub("Texts")
+    /// Staged copies of files parked on the shelf.
+    static let shelf: URL = sub("Shelf")
+    static var shelfIndex: URL { root.appendingPathComponent("shelf.json") }
     static var database: URL { root.appendingPathComponent("stash.sqlite") }
 
     private static func sub(_ name: String) -> URL {

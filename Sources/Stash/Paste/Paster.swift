@@ -95,6 +95,9 @@ enum Paster {
         case .image, .screenshot:
             if let path = item.blobPath { return URL(fileURLWithPath: path) as NSURL }
         case .file:
+            if let staged = item.blobPath, FileManager.default.fileExists(atPath: staged) {
+                return URL(fileURLWithPath: staged) as NSURL
+            }
             if let path = item.fileURLs.first { return URL(fileURLWithPath: path) as NSURL }
         default:
             break
@@ -149,6 +152,8 @@ enum Paster {
 
     /// Item providers used for dragging clips out into other apps.
     static func itemProvider(for item: ClipItem) -> NSItemProvider {
+        // Called exactly when a drag begins from our own UI.
+        DragWatcher.shared.suppressUntilMouseUp()
         switch item.kind {
         case .image, .screenshot:
             if let path = item.blobPath {
@@ -157,8 +162,10 @@ enum Paster {
                 return provider
             }
         case .file:
-            if let first = item.fileURLs.first,
-               let provider = NSItemProvider(contentsOf: URL(fileURLWithPath: first)) {
+            let source = item.blobPath.map { URL(fileURLWithPath: $0) }
+                .flatMap { FileManager.default.fileExists(atPath: $0.path) ? $0 : nil }
+                ?? item.fileURLs.first.map { URL(fileURLWithPath: $0) }
+            if let source, let provider = NSItemProvider(contentsOf: source) {
                 return provider
             }
         default:
