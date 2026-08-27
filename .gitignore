@@ -14,3 +14,9 @@ build/
 *.xcuserdatad
 xcuserdata/
 DerivedData/
+
+# Xcode
+*.xcworkspace/xcuserdata/
+Stash.xcodeproj/xcuserdata/
+Stash.xcodeproj/project.xcworkspace/xcuserdata/
+*.xcarchive

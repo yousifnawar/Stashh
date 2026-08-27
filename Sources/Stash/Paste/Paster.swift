@@ -46,23 +46,27 @@ enum Paster {
         ClipStore.shared.markUsed(item)
     }
 
-    /// Copy, restore focus, then synthesise ⌘V. Falls back to a plain copy when
-    /// Accessibility permission has not been granted.
+    /// Copy, restore focus, then synthesise ⌘V.
+    ///
+    /// The App Store build stops after restoring focus: `CGEvent.post` is
+    /// unavailable to sandboxed apps, and App Review rejects it under 2.4.5 as a
+    /// non-accessibility use of an accessibility API. The clip is on the
+    /// clipboard and the right app is frontmost, so ⌘V is one keystroke away.
     static func paste(_ item: ClipItem, restoreFocus: Bool = true) {
         copyToPasteboard(item)
 
-        guard Settings.shared.pasteDirectly else { return }
-        guard Permissions.hasAccessibility else {
-            Permissions.promptForAccessibilityOnce()
-            return
-        }
-
         let app = previousApp
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
-            if restoreFocus, let app, !app.isActive {
-                app.activate()
+            if restoreFocus, let app, !app.isActive { app.activate() }
+
+            #if !APPSTORE
+            guard Settings.shared.pasteDirectly else { return }
+            guard Permissions.hasAccessibility else {
+                Permissions.promptForAccessibilityOnce()
+                return
             }
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.12) { sendCommandV() }
+            #endif
         }
     }
 
@@ -74,6 +78,7 @@ enum Paster {
         paste(stripped)
     }
 
+    #if !APPSTORE
     private static func sendCommandV() {
         guard let source = CGEventSource(stateID: .combinedSessionState) else { return }
         source.setLocalEventsFilterDuringSuppressionState(
@@ -88,6 +93,7 @@ enum Paster {
         down.post(tap: .cgAnnotatedSessionEventTap)
         up.post(tap: .cgAnnotatedSessionEventTap)
     }
+    #endif
 
     /// One pasteboard object per clip — the unit AppKit drags in a multi-item session.
     static func pasteboardWriter(for item: ClipItem) -> NSPasteboardWriting? {

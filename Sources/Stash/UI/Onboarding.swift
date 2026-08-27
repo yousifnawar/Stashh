@@ -117,8 +117,10 @@ struct OnboardingView: View {
                  accent: Color(nsColor: ItemKind.file.accent), art: .shortcuts),
 
             Page(eyebrow: "One last thing",
-                 title: "Let Stash paste for you",
-                 body: "Accessibility permission is what lets Stash press ⌘V in the app you were using. Without it Stash still works — it just puts the clip on your clipboard and you paste it yourself.",
+                 title: Permissions.needsAccessibility ? "Let Stash paste for you" : "You're ready",
+                 body: Permissions.needsAccessibility
+                    ? "Accessibility permission is what lets Stash press ⌘V in the app you were using. Without it Stash still works — it just puts the clip on your clipboard and you paste it yourself."
+                    : "Choosing a clip copies it and brings back the app you were working in, so ⌘V drops it straight where you left off.\n\nIf you want screenshots captured automatically, point Stash at the folder they're saved to in Settings.",
                  accent: .orange, art: .permissions)
         ]
     }
@@ -176,7 +178,9 @@ struct OnboardingView: View {
     private var permissionControls: some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack(spacing: 10) {
-                if accessibilityGranted {
+                if !Permissions.needsAccessibility {
+                    Button("Choose Screenshot Folder…") { _ = ScreenshotFolder.chooseFolder() }
+                } else if accessibilityGranted {
                     Label("Accessibility granted", systemImage: "checkmark.circle.fill")
                         .font(.system(size: 12, weight: .medium))
                         .foregroundStyle(.green)

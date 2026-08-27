@@ -14,23 +14,15 @@ final class ScreenshotWatcher {
 
     private init() {}
 
-    /// Reads `com.apple.screencapture location`, falling back to the Desktop.
-    static func screenshotFolder() -> URL {
-        let defaults = UserDefaults(suiteName: "com.apple.screencapture")
-        if let loc = defaults?.string(forKey: "location") {
-            let expanded = (loc as NSString).expandingTildeInPath
-            var isDir: ObjCBool = false
-            if FileManager.default.fileExists(atPath: expanded, isDirectory: &isDir), isDir.boolValue {
-                return URL(fileURLWithPath: expanded)
-            }
-        }
-        return FileManager.default.urls(for: .desktopDirectory, in: .userDomainMask)[0]
-    }
+    static func screenshotFolder() -> URL? { ScreenshotFolder.resolve() }
 
     func start() {
         stop()
         guard Settings.shared.captureScreenshots else { return }
-        let folder = Self.screenshotFolder()
+        guard let folder = Self.screenshotFolder() else {
+            // Sandboxed and no folder chosen yet — Settings offers the picker.
+            return
+        }
         watchedURL = folder
 
         // Everything already on disk is "old" — we only want captures from now on.

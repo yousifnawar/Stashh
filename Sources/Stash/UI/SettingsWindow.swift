@@ -27,6 +27,7 @@ struct SettingsView: View {
     @ObservedObject private var settings = Settings.shared
     @ObservedObject private var store = ClipStore.shared
     @State private var accessibilityGranted = Permissions.hasAccessibility
+    @State private var folderTick = 0
 
     var body: some View {
         ScrollView {
@@ -36,7 +37,7 @@ struct SettingsView: View {
                     .foregroundStyle(Theme.primary)
                     .padding(.top, 26)
 
-                if !accessibilityGranted {
+                if Permissions.needsAccessibility, !accessibilityGranted {
                     permissionCard
                 }
 
@@ -46,6 +47,7 @@ struct SettingsView: View {
                         .onChange(of: settings.captureScreenshots) { _, _ in
                             ScreenshotWatcher.shared.restart()
                         }
+                    if settings.captureScreenshots { screenshotFolderRow }
                     Toggle("Play a sound on capture", isOn: $settings.playSound)
                 }
 
@@ -72,9 +74,14 @@ struct SettingsView: View {
                 }
 
                 group("Pasting") {
-                    Toggle("Paste directly into the app I was using", isOn: $settings.pasteDirectly)
-                    Text("Needs Accessibility permission. When off, Stash only puts the clip on your clipboard.")
-                        .font(.system(size: 11)).foregroundStyle(Theme.tertiary)
+                    if Permissions.needsAccessibility {
+                        Toggle("Paste directly into the app I was using", isOn: $settings.pasteDirectly)
+                        Text("Needs Accessibility permission. When off, Stash only puts the clip on your clipboard.")
+                            .font(.system(size: 11)).foregroundStyle(Theme.tertiary)
+                    } else {
+                        Text("Choosing a clip copies it and brings back the app you were using — press ⌘V to drop it in.")
+                            .font(.system(size: 11)).foregroundStyle(Theme.tertiary)
+                    }
                 }
 
                 group("History") {
@@ -143,6 +150,28 @@ struct SettingsView: View {
         .background(Theme.panel)
         .preferredColorScheme(.dark)
         .onAppear { accessibilityGranted = Permissions.hasAccessibility }
+    }
+
+    /// Sandboxed builds cannot find the screenshot folder on their own.
+    @ViewBuilder
+    private var screenshotFolderRow: some View {
+        HStack(spacing: 8) {
+            Image(systemName: ScreenshotFolder.isConfigured ? "folder.fill" : "folder.badge.questionmark")
+                .font(.system(size: 11))
+                .foregroundStyle(ScreenshotFolder.isConfigured ? Theme.secondary : .orange)
+            Text(ScreenshotFolder.displayPath)
+                .font(.system(size: 11))
+                .foregroundStyle(Theme.tertiary)
+                .lineLimit(1)
+                .truncationMode(.middle)
+            Spacer()
+            Button(ScreenshotFolder.isConfigured ? "Change…" : "Choose Folder…") {
+                _ = ScreenshotFolder.chooseFolder()
+                folderTick &+= 1
+            }
+            .font(.system(size: 11))
+        }
+        .id(folderTick)
     }
 
     private var permissionCard: some View {
