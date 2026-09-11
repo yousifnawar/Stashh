@@ -37,7 +37,13 @@ enum ShortcutID: String, CaseIterable, Codable, Identifiable {
 
     var defaultCombo: KeyCombo {
         switch self {
-        case .notch:       return KeyCombo(keyCode: UInt16(kVK_ANSI_P), modifiers: [.command])
+        case .notch:
+            #if APPSTORE
+            // Reviewers reject apps that take over standard system shortcuts.
+            return KeyCombo(keyCode: UInt16(kVK_ANSI_P), modifiers: [.command, .shift])
+            #else
+            return KeyCombo(keyCode: UInt16(kVK_ANSI_P), modifiers: [.command])
+            #endif
         case .quickSearch: return KeyCombo(keyCode: UInt16(kVK_ANSI_V), modifiers: [.command, .shift])
         case .library:     return KeyCombo(keyCode: UInt16(kVK_ANSI_C), modifiers: [.command, .shift])
         }

@@ -132,7 +132,11 @@ enum SelfTest {
 
         check("defaults bound for every action",
               ShortcutID.allCases.allSatisfy { shortcuts.combo($0) != nil })
+        #if APPSTORE
+        check("store build defaults notch to ⇧⌘P", shortcuts.label(.notch) == "⇧⌘P", shortcuts.label(.notch))
+        #else
         check("notch defaults to ⌘P", shortcuts.label(.notch) == "⌘P", shortcuts.label(.notch))
+        #endif
         check("search defaults to ⇧⌘V", shortcuts.label(.quickSearch) == "⇧⌘V",
               shortcuts.label(.quickSearch))
 
