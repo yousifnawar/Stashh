@@ -13,8 +13,15 @@ enum NotchGeometry {
         var screen: NSScreen
     }
 
+    /// The shell lives on the **main display** — the one chosen in System
+    /// Settings → Displays, which carries the menu bar and is always
+    /// `NSScreen.screens.first`. If that display has a physical notch the shell
+    /// wraps it; otherwise it draws a virtual one at the top centre.
+    ///
+    /// Deliberately not "whichever screen has a notch": with a laptop beside an
+    /// external monitor set as main, that would pin Stash to the laptop.
     static func metrics() -> Metrics {
-        let screen = NSScreen.screens.first { $0.safeAreaInsets.top > 0 } ?? NSScreen.main ?? NSScreen.screens[0]
+        let screen = NSScreen.screens.first ?? NSScreen.main ?? NSScreen()
         if screen.safeAreaInsets.top > 0,
            let left = screen.auxiliaryTopLeftArea,
            let right = screen.auxiliaryTopRightArea {

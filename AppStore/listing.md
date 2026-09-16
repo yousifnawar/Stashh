@@ -71,6 +71,17 @@ To test:
 
 Screenshots are only captured from a folder the user explicitly chooses in Settings (security-scoped bookmark). The app contains no networking code and collects no data.
 
+## App Sandbox Information (click + and add each one)
+
+com.apple.security.files.user-selected.read-write
+  The user chooses the folder their macOS screenshots are saved to. Stash watches
+  only that folder so new screenshots appear in their clipboard history. No other
+  location is read or written.
+
+com.apple.security.files.bookmarks.app-scope
+  A security-scoped bookmark stores the folder the user chose, so it can be
+  reopened on the next launch without asking them to pick it again.
+
 ## App Privacy (the questionnaire)
 "Do you or your third-party partners collect data from this app?"  →  No, we do not collect data from this app
 Result label: Data Not Collected
