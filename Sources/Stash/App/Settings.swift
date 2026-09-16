@@ -9,12 +9,6 @@ final class Settings: ObservableObject {
 
     @Published var captureEnabled: Bool { didSet { d.set(captureEnabled, forKey: "captureEnabled") } }
     @Published var captureScreenshots: Bool { didSet { d.set(captureScreenshots, forKey: "captureScreenshots") } }
-    @Published var notchEnabled: Bool {
-        didSet {
-            d.set(notchEnabled, forKey: "notchEnabled")
-            NotificationCenter.default.post(name: .stashNotchPreferenceChanged, object: nil)
-        }
-    }
     /// The file shelf: catch files dragged to the top of the screen and hold them.
     @Published var shelfEnabled: Bool { didSet { d.set(shelfEnabled, forKey: "shelfEnabled") } }
     /// When off, the shell only opens from its shortcut or the menu bar.
@@ -22,6 +16,7 @@ final class Settings: ObservableObject {
         didSet {
             d.set(notchOpensOnHover, forKey: "notchOpensOnHover")
             NotchController.shared.collapse()
+            NotchController.shared.settingsChanged()
         }
     }
     @Published var pasteDirectly: Bool { didSet { d.set(pasteDirectly, forKey: "pasteDirectly") } }
@@ -51,7 +46,6 @@ final class Settings: ObservableObject {
         func bool(_ k: String, _ def: Bool) -> Bool { Settings.bool(d, k, def) }
         captureEnabled = bool("captureEnabled", true)
         captureScreenshots = bool("captureScreenshots", true)
-        notchEnabled = bool("notchEnabled", true)
         notchOpensOnHover = bool("notchOpensOnHover", true)
         shelfEnabled = bool("shelfEnabled", true)
         pasteDirectly = bool("pasteDirectly", true)
@@ -77,7 +71,6 @@ final class Settings: ObservableObject {
 }
 
 extension Notification.Name {
-    static let stashNotchPreferenceChanged = Notification.Name("stash.notchPreferenceChanged")
     static let stashShowQuickSearch = Notification.Name("stash.showQuickSearch")
     static let stashShowLibrary = Notification.Name("stash.showLibrary")
     static let stashDidCapture = Notification.Name("stash.didCapture")

@@ -52,9 +52,7 @@ struct SettingsView: View {
                 }
 
                 group("Notch Shell") {
-                    Toggle("Show the notch shell", isOn: $settings.notchEnabled)
                     Toggle("Open it when I hover the notch", isOn: $settings.notchOpensOnHover)
-                        .disabled(!settings.notchEnabled)
                     Text(settings.notchOpensOnHover
                          ? "Move your pointer onto the notch and your clips slide out; move away and it closes again."
                          : "The shell stays out of your way — it only opens from its shortcut or the menu bar.")

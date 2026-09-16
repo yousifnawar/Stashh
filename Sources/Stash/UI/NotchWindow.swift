@@ -123,8 +123,13 @@ final class NotchController: ObservableObject {
     // MARK: Lifecycle
 
     func start() {
-        guard Settings.shared.notchEnabled else { stop(); return }
+        // No on/off switch: with hover off the shell is invisible and click-through
+        // until its shortcut is pressed, so an "off" state only ever broke the
+        // shortcut. Hover, the shelf and the shortcut each have their own control.
         guard panel == nil else { return }
+        defer {
+            StashLog.write("notch panel started on \(metrics.screen.localizedName) frame=\(panel?.frame ?? .zero) realNotch=\(metrics.hasRealNotch)")
+        }
 
         metrics = NotchGeometry.metrics()
         let size = NotchGeometry.windowSize
@@ -198,9 +203,26 @@ final class NotchController: ObservableObject {
 
     // MARK: Shell geometry
 
+    /// On a display with no physical notch there is no hardware to blend into.
+    /// With hover on, a small handle marks where to point. With hover off
+    /// nothing should sit in the menu bar at all, so the collapsed shell is an
+    /// invisible sliver at the top edge that the shortcut grows downward.
+    var hidesWhenCollapsed: Bool {
+        !metrics.hasRealNotch && !Settings.shared.notchOpensOnHover
+    }
+
+    /// Re-evaluates anything derived from settings (called when they change).
+    func settingsChanged() {
+        objectWillChange.send()
+        updateGate()
+    }
+
     var shellSize: CGSize {
         switch state {
-        case .collapsed: return metrics.notchSize
+        case .collapsed:
+            return hidesWhenCollapsed
+                ? CGSize(width: metrics.notchSize.width, height: 1)
+                : metrics.notchSize
         case .dropZone: return NotchGeometry.dropZoneSize(notch: metrics.notchSize)
         case .expanded: return NotchGeometry.expandedSize(notch: metrics.notchSize)
         }
@@ -318,11 +340,7 @@ final class NotchController: ObservableObject {
 
     /// The keyboard shortcut: opens if closed, closes if open.
     func toggleFromShortcut() {
-        guard Settings.shared.notchEnabled else {
-            // Nothing to show — fall back to the searchable panel.
-            QuickSearchController.shared.toggle()
-            return
-        }
+        StashLog.write("notch shortcut: state=\(state) panel=\(panel != nil) screen=\(metrics.screen.localizedName) realNotch=\(metrics.hasRealNotch)")
         if state == .expanded {
             collapse()
         } else {

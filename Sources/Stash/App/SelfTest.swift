@@ -17,7 +17,7 @@ enum SelfTest {
             .appendingPathComponent("stash-selftest-\(UUID().uuidString)", isDirectory: true)
         let suiteName = "com.nawar.stash.selftest.\(UUID().uuidString)"
         Shortcuts.defaultsStore = UserDefaults(suiteName: suiteName)!
-        defer { UserDefaults.standard.removePersistentDomain(forName: suiteName) }
+
         _ = ClipStore.shared
         pump(0.4)
 
@@ -30,6 +30,13 @@ enum SelfTest {
         testShelf()
 
         print(failures == 0 ? "\nALL PASSED" : "\n\(failures) FAILED")
+        // exit() skips `defer`, so clean up the throwaway defaults suite by hand:
+        // removePersistentDomain alone leaves the .plist file behind.
+        UserDefaults.standard.removePersistentDomain(forName: suiteName)
+        let prefs = FileManager.default.urls(for: .libraryDirectory, in: .userDomainMask)[0]
+            .appendingPathComponent("Preferences/\(suiteName).plist")
+        try? FileManager.default.removeItem(at: prefs)
+
         // Exit code matters: CI treats a non-zero status as a failed build.
         exit(failures == 0 ? 0 : 1)
     }

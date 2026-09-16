@@ -41,6 +41,7 @@ struct NotchShellView: View {
                     .clipped()
             }
             .frame(width: shell.width, height: shell.height)
+            .opacity(controller.state == .collapsed && controller.hidesWhenCollapsed ? 0 : 1)
             // The little concave joins that make the shell read as one object.
             .overlay(alignment: .topLeading) {
                 if controller.state != .collapsed {

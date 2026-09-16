@@ -16,9 +16,30 @@ final class ScreenshotWatcher {
 
     static func screenshotFolder() -> URL? { ScreenshotFolder.resolve() }
 
+    /// Everything here runs on `queue`, never the main thread. The first touch of
+    /// a protected folder like the Desktop blocks inside `open()` until the user
+    /// answers the Files & Folders prompt — and that prompt can easily be hidden
+    /// on another display. Done on the main thread, it froze the whole app at
+    /// launch, before the notch panel or shortcuts could come up.
     func start() {
-        stop()
-        guard Settings.shared.captureScreenshots else { return }
+        let enabled = Settings.shared.captureScreenshots
+        queue.async { [weak self] in self?.startOnQueue(enabled: enabled) }
+    }
+
+    func stop() {
+        queue.async { [weak self] in self?.stopOnQueue() }
+    }
+
+    func restart() { start() }
+
+    private func stopOnQueue() {
+        source?.cancel()
+        source = nil
+    }
+
+    private func startOnQueue(enabled: Bool) {
+        stopOnQueue()
+        guard enabled else { return }
         guard let folder = Self.screenshotFolder() else {
             // Sandboxed and no folder chosen yet — Settings offers the picker.
             return
@@ -43,13 +64,6 @@ final class ScreenshotWatcher {
         src.resume()
         source = src
     }
-
-    func stop() {
-        source?.cancel()
-        source = nil
-    }
-
-    func restart() { start() }
 
     private func currentFiles(in folder: URL) -> [URL] {
         let keys: [URLResourceKey] = [.contentModificationDateKey, .isRegularFileKey]

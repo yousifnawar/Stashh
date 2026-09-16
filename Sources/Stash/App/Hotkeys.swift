@@ -33,8 +33,10 @@ final class HotKeyCenter {
                                          GetApplicationEventTarget(), 0, &ref)
         guard status == noErr else {
             NSLog("[Stash] hotkey '\(name)' failed to register: \(status)")
+            StashLog.write("hotkey \(name) FAILED to register (status \(status)) key=\(keyCode) mods=\(modifiers)")
             return
         }
+        StashLog.write("hotkey \(name) registered key=\(keyCode) mods=\(modifiers)")
         entries[id] = Entry(ref: ref, handler: handler)
         idsByName[name] = id
     }
@@ -45,7 +47,11 @@ final class HotKeyCenter {
         if let ref = entry.ref { UnregisterEventHotKey(ref) }
     }
 
-    fileprivate func fire(_ id: UInt32) { entries[id]?.handler() }
+    fileprivate func fire(_ id: UInt32) {
+        let name = idsByName.first { $0.value == id }?.key ?? "unknown(\(id))"
+        StashLog.write("hotkey \(name) fired")
+        entries[id]?.handler()
+    }
 
     private func installHandlerIfNeeded() {
         guard !installed else { return }

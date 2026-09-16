@@ -10,12 +10,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         guard !handOffToRunningInstance() else { return }
         NSApp.setActivationPolicy(.accessory)
 
+        // Interactive surfaces first, capture second: nothing that touches the
+        // disk may stand between launch and a working shortcut.
         MenuBarController.shared.install()
         HotKeys.installDefaults()
+        NotchController.shared.start()
+        DragWatcher.shared.start()
         ClipboardMonitor.shared.start()
         ScreenshotWatcher.shared.start()
-        DragWatcher.shared.start()
-        NotchController.shared.start()
 
         NotificationCenter.default.publisher(for: .stashShowQuickSearch)
             .receive(on: DispatchQueue.main)
@@ -27,14 +29,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             .sink { _ in LibraryWindowController.shared.show() }
             .store(in: &cancellables)
 
-        NotificationCenter.default.publisher(for: .stashNotchPreferenceChanged)
-            .receive(on: DispatchQueue.main)
-            .sink { _ in
-                Settings.shared.notchEnabled
-                    ? NotchController.shared.start()
-                    : NotchController.shared.stop()
-            }
-            .store(in: &cancellables)
 
         // Retention sweep now and once a day after.
         ClipStore.shared.prune(olderThanDays: Settings.shared.retentionDays)
