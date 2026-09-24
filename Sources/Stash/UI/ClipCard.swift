@@ -139,9 +139,12 @@ struct ClipTile: View {
     var selected: Bool = false
     /// When set, this tile belongs to a multi-selection and drags the whole set.
     var multiDrag: (() -> [ClipItem])? = nil
-    /// When set, the tile shows a selection circle on hover that adds/removes it
-    /// from the selection without replacing it — no modifier key needed.
+    /// When set, the tile shows a selection circle that adds/removes it from the
+    /// selection without replacing it — no modifier key needed.
     var onToggleSelect: (() -> Void)? = nil
+    /// True while anything is selected. Every circle then stays visible, so a
+    /// click never lands on a tile whose circle had not appeared yet.
+    var selectionActive: Bool = false
     var onActivate: () -> Void
     var onDoubleActivate: (() -> Void)? = nil
 
@@ -216,10 +219,18 @@ struct ClipTile: View {
                 .transition(.opacity)
             }
         }
-        .scaleEffect(hovering ? 1.03 : 1)
+        // No hover scale while the AppKit drag layer is installed: that layer
+        // hit-tests against its own frame and ignores a SwiftUI transform, so a
+        // scaled tile would take clicks a couple of points away from where it draws.
+        .scaleEffect(hovering && multiDrag == nil ? 1.03 : 1)
         .animation(Theme.quick, value: hovering)
         .stashHover($hovering)
-        .modifier(TileInteraction(item: item, multiDrag: multiDrag,
+        // The drag layer exists only under the pointer. Installed on every
+        // selected tile it also covered tiles scrolled out of view — AppKit
+        // hit-testing ignores the ScrollView's clipping, so those off-screen
+        // layers swallowed clicks meant for whatever was actually on screen,
+        // which selected a seemingly random other clip.
+        .modifier(TileInteraction(item: item, multiDrag: hovering ? multiDrag : nil,
                                   onActivate: onActivate, onDoubleActivate: onDoubleActivate))
         .contextMenu {
             ClipContextMenu(item: item, selection: multiDrag?() ?? [],
@@ -228,9 +239,9 @@ struct ClipTile: View {
         .help(item.title)
     }
 
-    /// Visible once the pointer is over the tile, or whenever it is already picked.
+    /// Visible on hover, once picked, or while any selection is under way.
     private var showsCheckbox: Bool {
-        onToggleSelect != nil && (hovering || selected)
+        onToggleSelect != nil && (hovering || selected || selectionActive)
     }
 
     private var selectionCircle: some View {
@@ -246,10 +257,11 @@ struct ClipTile: View {
                         .foregroundStyle(.white)
                 }
             }
-            .frame(width: 19, height: 19)
+            .frame(width: 21, height: 21)
         }
         .buttonStyle(.plain)
         .padding(7)
+        .contentShape(Rectangle())
         .help(selected ? "Remove from selection" : "Add to selection")
     }
 }

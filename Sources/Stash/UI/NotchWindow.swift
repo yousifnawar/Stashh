@@ -40,7 +40,7 @@ enum NotchGeometry {
 
     /// Header (which flanks the notch) + clip strip + filter row.
     static func expandedSize(notch: CGSize) -> CGSize {
-        CGSize(width: expandedWidth, height: max(notch.height, 34) + 1 + 136 + 42)
+        CGSize(width: expandedWidth, height: max(notch.height, 34) + 1 + 136 + 16 + 42)
     }
 
     static func dropZoneSize(notch: CGSize) -> CGSize {

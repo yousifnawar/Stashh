@@ -38,7 +38,7 @@ final class MultiDragView: NSView, NSDraggingSource {
 
     /// The selection circle is SwiftUI content drawn beneath this layer, so the
     /// corner it occupies has to fall through rather than start a drag.
-    private let checkboxCorner = CGSize(width: 34, height: 34)
+    private let checkboxCorner = CGSize(width: 42, height: 42)
 
     override func hitTest(_ point: NSPoint) -> NSView? {
         let local = convert(point, from: superview)

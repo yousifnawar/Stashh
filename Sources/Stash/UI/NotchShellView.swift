@@ -20,6 +20,9 @@ struct NotchShellView: View {
     @State private var tab: NotchTab
     /// Clips picked with the selection circles, for dragging several out at once.
     @State private var selection: Set<String> = []
+    /// Leading item of each strip, both read and written by its scrollbar.
+    @State private var stripAnchor: String?
+    @State private var shelfAnchor: String?
 
     private var shell: CGSize { controller.shellSize }
     private var notch: CGSize { controller.metrics.notchSize }
@@ -215,20 +218,44 @@ struct NotchShellView: View {
     }
 
     private var strip: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 10) {
-                ForEach(visibleItems) { item in
-                    ClipTile(item: item, width: 146, height: 112,
-                             selected: selection.contains(item.id),
-                             multiDrag: multiDragSource(for: item),
-                             onToggleSelect: { toggle(item) },
-                             onActivate: { controller.activate(item) })
+        VStack(spacing: 0) {
+            ScrollView(.horizontal, showsIndicators: false) {
+                LazyHStack(spacing: 10) {
+                    ForEach(visibleItems) { item in
+                        ClipTile(item: item, width: 146, height: 112,
+                                 selected: selection.contains(item.id),
+                                 multiDrag: multiDragSource(for: item),
+                                 onToggleSelect: { toggle(item) },
+                                 selectionActive: !selection.isEmpty,
+                                 onActivate: {
+                                     // Once picking has started, a plain click keeps
+                                     // picking rather than pasting and closing.
+                                     if selection.isEmpty { controller.activate(item) }
+                                     else { toggle(item) }
+                                 })
+                    }
                 }
+                .scrollTargetLayout()
+                .padding(.horizontal, 16)
+                .padding(.vertical, 12)
             }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 12)
+            .scrollPosition(id: $stripAnchor)
+            .frame(height: 136)
+
+            StripScrollBar(count: visibleItems.count,
+                           index: anchorBinding($stripAnchor, items: visibleItems))
+                .padding(.horizontal, 16)
         }
-        .frame(height: 136)
+    }
+
+    /// Maps a scrollbar position onto the item sitting at the strip's leading edge.
+    private func anchorBinding(_ anchor: Binding<String?>, items: [ClipItem]) -> Binding<Int> {
+        Binding(
+            get: { items.firstIndex { $0.id == anchor.wrappedValue } ?? 0 },
+            set: { index in
+                guard items.indices.contains(index) else { return }
+                withAnimation(.easeOut(duration: 0.14)) { anchor.wrappedValue = items[index].id }
+            })
     }
 
     private var emptyState: some View {
@@ -293,22 +320,33 @@ struct NotchShellView: View {
     // MARK: - Shelf
 
     private var shelfStrip: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 10) {
-                ForEach(shelf.items) { item in
-                    ClipTile(item: item, width: 146, height: 112,
-                             selected: selection.contains(item.id),
-                             multiDrag: shelfMultiDragSource(for: item),
-                             onToggleSelect: { toggle(item) },
-                             onActivate: { revealOrOpen(item) })
-                        .opacity(ShelfStore.isMissing(item) ? 0.45 : 1)
-                        .overlay(alignment: .topTrailing) { removeButton(item) }
+        VStack(spacing: 0) {
+            ScrollView(.horizontal, showsIndicators: false) {
+                LazyHStack(spacing: 10) {
+                    ForEach(shelf.items) { item in
+                        ClipTile(item: item, width: 146, height: 112,
+                                 selected: selection.contains(item.id),
+                                 multiDrag: shelfMultiDragSource(for: item),
+                                 onToggleSelect: { toggle(item) },
+                                 selectionActive: !selection.isEmpty,
+                                 onActivate: {
+                                     if selection.isEmpty { revealOrOpen(item) } else { toggle(item) }
+                                 })
+                            .opacity(ShelfStore.isMissing(item) ? 0.45 : 1)
+                            .overlay(alignment: .topTrailing) { removeButton(item) }
+                    }
                 }
+                .scrollTargetLayout()
+                .padding(.horizontal, 16)
+                .padding(.vertical, 12)
             }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 12)
+            .scrollPosition(id: $shelfAnchor)
+            .frame(height: 136)
+
+            StripScrollBar(count: shelf.items.count,
+                           index: anchorBinding($shelfAnchor, items: shelf.items))
+                .padding(.horizontal, 16)
         }
-        .frame(height: 136)
     }
 
     private func removeButton(_ item: ClipItem) -> some View {
@@ -413,6 +451,45 @@ struct NotchShellView: View {
 // MARK: - Small controls
 
 enum NotchTab { case clips, shelf }
+
+/// A draggable bar under a strip, for walking through clips that run off the
+/// right-hand edge without a trackpad swipe.
+struct StripScrollBar: View {
+    let count: Int
+    var visibleCount: Int = 4
+    @Binding var index: Int
+    @State private var dragging = false
+
+    var body: some View {
+        GeometryReader { geo in
+            let maxIndex = max(count - visibleCount, 0)
+            if maxIndex > 0 {
+                let width = geo.size.width
+                let thumb = max(44, width * CGFloat(visibleCount) / CGFloat(max(count, 1)))
+                let travel = max(width - thumb, 1)
+                let fraction = CGFloat(min(max(index, 0), maxIndex)) / CGFloat(maxIndex)
+                ZStack(alignment: .leading) {
+                    Capsule().fill(Color.white.opacity(0.07)).frame(height: 5)
+                    Capsule().fill(Color.white.opacity(dragging ? 0.6 : 0.32))
+                        .frame(width: thumb, height: 5)
+                        .offset(x: travel * fraction)
+                }
+                .frame(maxHeight: .infinity)
+                .contentShape(Rectangle())
+                .gesture(
+                    DragGesture(minimumDistance: 0)
+                        .onChanged { value in
+                            dragging = true
+                            let x = min(max(value.location.x - thumb / 2, 0), travel)
+                            index = Int(round(x / travel * CGFloat(maxIndex)))
+                        }
+                        .onEnded { _ in dragging = false }
+                )
+            }
+        }
+        .frame(height: 16)
+    }
+}
 
 /// Sits quietly in the corner of a shelf tile until you reach for it.
 struct ShelfRemoveButton: View {

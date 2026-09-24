@@ -395,6 +395,7 @@ struct LibraryView: View {
                                          selected: selection.contains(item.id),
                                          multiDrag: multiDragSource(for: item),
                                          onToggleSelect: { toggle(item) },
+                                         selectionActive: !selection.isEmpty,
                                          onActivate: { select(item) },
                                          onDoubleActivate: { Paster.paste(item) })
                             }
